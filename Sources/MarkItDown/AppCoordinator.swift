@@ -4,7 +4,7 @@ import Foundation
 @MainActor
 final class AppCoordinator {
     let state: AppState
-    let dropDelegate: FolderDropDelegate
+    let dropDelegate: ItemDropDelegate
     private let markitdownRunner: MarkitdownRunning
     private let engine: ConversionEngine
     private let logger: Logger?
@@ -13,7 +13,7 @@ final class AppCoordinator {
 
     init(
         state: AppState,
-        dropDelegate: FolderDropDelegate,
+        dropDelegate: ItemDropDelegate,
         markitdownRunner: MarkitdownRunning = MarkitdownRunner(),
         engine: ConversionEngine? = nil,
         logger: Logger? = nil

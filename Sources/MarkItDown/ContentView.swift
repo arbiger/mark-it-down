@@ -2,7 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @Bindable var state: AppState
-    let dropDelegate: FolderDropDelegate
+    let dropDelegate: ItemDropDelegate
     let onPickFolder: () -> Void
     let onStart: () -> Void
     let onStop: () -> Void

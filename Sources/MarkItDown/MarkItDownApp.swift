@@ -3,7 +3,7 @@ import SwiftUI
 @main
 struct MarkItDownApp: App {
     @State private var state = AppState()
-    @State private var dropDelegate = FolderDropDelegate()
+    @State private var dropDelegate = ItemDropDelegate()
     @State private var coordinator: AppCoordinator?
 
     var body: some Scene {
@@ -28,7 +28,7 @@ struct MarkItDownApp: App {
     private func initialBootstrap() async {
         let coord = AppCoordinator(state: state, dropDelegate: dropDelegate)
         self.coordinator = coord
-        dropDelegate.onFolder = { [weak coord] url in
+        dropDelegate.onRoot = { [weak coord] url in
             coord?.loadFolder(url)
         }
         await coord.bootstrap()
