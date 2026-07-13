@@ -20,7 +20,7 @@ These apply to every task below; do not re-state per-task.
 - **Deployment target:** macOS 14 (Sonoma). Use `.macOS(.v14)`.
 - **Indent:** 4 spaces, no tabs.
 - **Swift style:** `let` over `var`; structs over classes where possible; `@MainActor` for all UI-touching types; `async/await` (no completion handlers); `throws` over `Result`; `URL` over `String` for paths.
-- **Testing:** XCTest. Use `swift test` to run all; `swift test --filter TestClassName` for one. Tests must fail before implementation and pass after.
+- **Testing:** Build-only verification per user decision (the macOS host has Command Line Tools only, no full Xcode, so XCTest is unavailable). Each task runs `swift build` to verify. The plan still describes unit tests for documentation, but they are NOT written — Task 16's manual smoke test is the sole integration check.
 - **Naming:** Types `PascalCase`, functions `camelCase`. Module name `MarkItDown` (matches SwiftPM target). Public app display name "Mark-It-Down".
 - **Commit cadence:** Every task ends with one focused commit. Use `git commit -m "<type>: <subject>"` — types: `chore`, `feat`, `fix`, `test`, `docs`.
 - **No force-push, no AI co-author trailers.**
