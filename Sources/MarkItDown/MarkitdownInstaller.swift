@@ -12,30 +12,46 @@ protocol CommandRunner {
 
 struct SystemCommandRunner: CommandRunner {
     func run(executable: URL, arguments: [String]) async throws -> CommandRunnerResult {
-        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<CommandRunnerResult, Error>) in
-            let process = Process()
-            process.executableURL = executable
-            process.arguments = arguments
-            let outPipe = Pipe()
-            let errPipe = Pipe()
-            process.standardOutput = outPipe
-            process.standardError = errPipe
-            process.terminationHandler = { proc in
-                let outData = (try? outPipe.fileHandleForReading.readToEnd()) ?? Data()
-                let errData = (try? errPipe.fileHandleForReading.readToEnd()) ?? Data()
-                let result = CommandRunnerResult(
-                    exitCode: proc.terminationStatus,
-                    stdout: String(data: outData, encoding: .utf8) ?? "",
-                    stderr: String(data: errData, encoding: .utf8) ?? ""
-                )
-                cont.resume(returning: result)
-            }
-            do {
-                try process.run()
-            } catch {
-                cont.resume(throwing: error)
+        try Task.checkCancellation()
+
+        let process = Process()
+        process.executableURL = executable
+        process.arguments = arguments
+
+        let outPipe = Pipe()
+        let errPipe = Pipe()
+        process.standardOutput = outPipe
+        process.standardError = errPipe
+
+        try process.run()
+
+        let stdoutTask = Task.detached {
+            (try? outPipe.fileHandleForReading.readToEnd()) ?? Data()
+        }
+        let stderrTask = Task.detached {
+            (try? errPipe.fileHandleForReading.readToEnd()) ?? Data()
+        }
+
+        let exitCode = await withTaskCancellationHandler {
+            await Task.detached {
+                process.waitUntilExit()
+                return process.terminationStatus
+            }.value
+        } onCancel: {
+            if process.isRunning {
+                process.terminate()
             }
         }
+
+        let outData = await stdoutTask.value
+        let errData = await stderrTask.value
+        try Task.checkCancellation()
+
+        return CommandRunnerResult(
+            exitCode: exitCode,
+            stdout: String(decoding: outData, as: UTF8.self),
+            stderr: String(decoding: errData, as: UTF8.self)
+        )
     }
 }
 
