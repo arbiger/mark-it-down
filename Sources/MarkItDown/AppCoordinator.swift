@@ -9,7 +9,10 @@ final class AppCoordinator {
     private let engine: ConversionEngine
     private let logger: Logger?
 
+    private var scanTask: Task<Void, Never>?
     private var currentConversionTask: Task<Void, Never>?
+    private var activeScanID: UUID?
+    private var activeConversionID: UUID?
 
     init(
         state: AppState,
@@ -63,13 +66,30 @@ final class AppCoordinator {
     }
 
     func loadFolder(_ url: URL) {
-        do {
-            let files = try FileScanner.scan(root: url)
-            let job = FolderJob(rootURL: url, files: files)
-            state.job = job
-            state.mode = .preview
-        } catch {
-            state.mode = .installFailed("Failed to scan folder: \(error)")
+        scanTask?.cancel()
+        let scanID = UUID()
+        activeScanID = scanID
+        state.mode = .scanning
+
+        scanTask = Task { @MainActor [weak self] in
+            do {
+                let files = try await Task.detached(priority: .userInitiated) {
+                    try FileScanner.scan(root: url)
+                }.value
+                try Task.checkCancellation()
+                guard let self, self.activeScanID == scanID else { return }
+                self.activeScanID = nil
+                self.scanTask = nil
+                self.state.job = FolderJob(rootURL: url, files: files)
+                self.state.mode = .preview
+            } catch is CancellationError {
+                return
+            } catch {
+                guard let self, self.activeScanID == scanID else { return }
+                self.activeScanID = nil
+                self.scanTask = nil
+                self.state.mode = .scanFailed(error.localizedDescription)
+            }
         }
     }
 
@@ -83,20 +103,28 @@ final class AppCoordinator {
         }
         state.job = fresh
 
+        currentConversionTask?.cancel()
+        let conversionID = UUID()
+        activeConversionID = conversionID
         currentConversionTask = Task { @MainActor [weak self] in
             guard let self = self else { return }
             await self.engine.run(
                 job: fresh,
                 pythonPath: pythonPath,
-                update: { id, status in
-                    await self.applyStatus(id: id, status: status)
+                update: { [weak self] id, status in
+                    guard let self, self.activeConversionID == conversionID else { return }
+                    self.applyStatus(id: id, status: status)
                 }
             )
-            await self.markDone()
+            guard self.activeConversionID == conversionID else { return }
+            self.activeConversionID = nil
+            self.currentConversionTask = nil
+            self.markDone()
         }
     }
 
     func stopConversion() {
+        activeConversionID = nil
         currentConversionTask?.cancel()
         currentConversionTask = nil
         state.mode = .preview
@@ -108,11 +136,17 @@ final class AppCoordinator {
     }
 
     func reset() {
+        activeScanID = nil
+        scanTask?.cancel()
+        scanTask = nil
+        activeConversionID = nil
+        currentConversionTask?.cancel()
+        currentConversionTask = nil
         state.job = nil
         state.mode = .empty
     }
 
-    private func applyStatus(id: UUID, status: ConversionStatus) async {
+    private func applyStatus(id: UUID, status: ConversionStatus) {
         guard var job = state.job else { return }
         guard let idx = job.files.firstIndex(where: { $0.id == id }) else { return }
         job.files[idx].status = status
@@ -122,12 +156,9 @@ final class AppCoordinator {
         state.job = job
     }
 
-    private func markDone() async {
+    private func markDone() {
         guard let job = state.job else { return }
-        let succeeded = job.files.filter {
-            if case .done = $0.status { return true } else { return false }
-        }.count
-        let failed = job.files.count - succeeded
-        state.mode = .done(succeeded: succeeded, failed: failed)
+        let counts = job.counts
+        state.mode = .done(succeeded: counts.succeeded, failed: counts.failed)
     }
 }

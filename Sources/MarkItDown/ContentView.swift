@@ -33,6 +33,10 @@ struct ContentView: View {
         switch state.mode {
         case .empty:
             dropZone(message: "Drop a folder here\nor click to pick")
+        case .scanning:
+            scanningView
+        case .scanFailed(let message):
+            scanFailedView(message: message)
         case .noPython:
             noPythonView
         case .installing(let progress):
@@ -45,6 +49,21 @@ struct ContentView: View {
             convertingList
         case .done(let succeeded, let failed):
             doneView(succeeded: succeeded, failed: failed)
+        }
+    }
+
+    private var scanningView: some View {
+        VStack(spacing: 8) {
+            ProgressView()
+            Text("Scanning files…").font(.callout)
+        }
+    }
+
+    private func scanFailedView(message: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Could not scan folder").font(.headline).foregroundStyle(.red)
+            Text(message).font(.caption).foregroundStyle(.secondary)
+            Button("Choose another folder") { onPickFolder() }
         }
     }
 
@@ -85,12 +104,14 @@ struct ContentView: View {
     private var footer: some View {
         HStack {
             switch state.mode {
-            case .empty, .noPython, .installing, .installFailed:
+            case .empty, .scanning, .scanFailed, .noPython, .installing, .installFailed:
                 EmptyView()
             case .preview:
                 Button("Change folder") { onPickFolder() }
                 Spacer()
-                Button("Start") { onStart() }.keyboardShortcut(.defaultAction)
+                Button("Start") { onStart() }
+                    .keyboardShortcut(.defaultAction)
+                    .disabled(state.job?.files.isEmpty != false)
             case .converting:
                 Spacer()
                 Button("Stop") { onStop() }
@@ -123,18 +144,24 @@ struct ContentView: View {
     private var previewList: some View {
         if let job = state.job {
             VStack(alignment: .leading, spacing: 4) {
-                Text("\(job.files.count) files found").font(.callout).bold()
-                List(job.files) { file in
-                    HStack {
-                        Text(file.sourceURL.lastPathComponent).lineLimit(1)
-                        Spacer()
-                        Image(systemName: "arrow.right").foregroundStyle(.tertiary)
-                        Text(file.outputURL.lastPathComponent).lineLimit(1)
-                            .foregroundStyle(.secondary)
+                if job.files.isEmpty {
+                    Text("No supported files found")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("\(job.files.count) files found").font(.callout).bold()
+                    List(job.files) { file in
+                        HStack {
+                            Text(file.sourceURL.lastPathComponent).lineLimit(1)
+                            Spacer()
+                            Image(systemName: "arrow.right").foregroundStyle(.tertiary)
+                            Text(file.outputURL.lastPathComponent).lineLimit(1)
+                                .foregroundStyle(.secondary)
+                        }
                     }
+                    .listStyle(.inset)
+                    .frame(minHeight: 220)
                 }
-                .listStyle(.inset)
-                .frame(minHeight: 220)
             }
         }
     }
@@ -143,13 +170,7 @@ struct ContentView: View {
     private var convertingList: some View {
         if let job = state.job {
             let total = job.files.count
-            let done = job.files.filter {
-                if case .done = $0.status { return true } else { return false }
-            }.count
-            let failed = job.files.filter {
-                if case .failed = $0.status { return true } else { return false }
-            }.count
-            let completed = done + failed
+            let completed = job.counts.completed
             VStack(alignment: .leading, spacing: 8) {
                 ProgressView(value: Double(completed), total: Double(max(total, 1)))
                 Text("\(completed) / \(total)").font(.caption).foregroundStyle(.secondary)

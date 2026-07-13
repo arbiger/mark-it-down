@@ -3,6 +3,8 @@ import Observation
 
 enum AppMode: Equatable {
     case empty
+    case scanning
+    case scanFailed(String)
     case noPython
     case installing(progress: String)
     case installFailed(String)
@@ -17,5 +19,4 @@ final class AppState {
     var mode: AppMode = .empty
     var job: FolderJob?
     var pythonPath: URL?
-    var installError: String?
 }
