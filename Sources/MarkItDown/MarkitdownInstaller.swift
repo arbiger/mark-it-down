@@ -10,6 +10,21 @@ protocol CommandRunner {
     func run(executable: URL, arguments: [String]) async throws -> CommandRunnerResult
 }
 
+enum MarkitdownInstallerError: LocalizedError {
+    case installationFailed(pythonPath: URL, stderr: String)
+
+    var errorDescription: String? {
+        switch self {
+        case .installationFailed(let pythonPath, let stderr):
+            let details = stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+            let command = "\(pythonPath.path) -m pip install --user "
+                + "--break-system-packages 'markitdown[all]'"
+            let prefix = details.isEmpty ? "Could not install markitdown." : details
+            return "\(prefix)\n\nRun manually:\n\(command)"
+        }
+    }
+}
+
 struct SystemCommandRunner: CommandRunner {
     func run(executable: URL, arguments: [String]) async throws -> CommandRunnerResult {
         try Task.checkCancellation()
@@ -66,12 +81,18 @@ enum MarkitdownInstaller {
         // Pass 1: pick the first python where `import markitdown` works. This avoids copying
         // when the user already has markitdown in a venv at e.g. /tmp/markitdown-work/venv.
         for python in candidates {
-            let probe = try await runner.run(
-                executable: python,
-                arguments: ["-c", "import markitdown"]
-            )
-            if probe.exitCode == 0 {
-                return python
+            do {
+                let probe = try await runner.run(
+                    executable: python,
+                    arguments: ["-c", "import markitdown"]
+                )
+                if probe.exitCode == 0 {
+                    return python
+                }
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                continue
             }
         }
         // Pass 2: install into the first candidate.
@@ -108,6 +129,16 @@ enum MarkitdownInstaller {
             executable: pythonPath,
             arguments: ["-m", "pip", "install", "--break-system-packages", "markitdown[all]"]
         )
-        return systemInstall.exitCode == 0
+        if systemInstall.exitCode == 0 {
+            return true
+        }
+
+        let finalError = systemInstall.stderr.isEmpty
+            ? installResult.stderr
+            : systemInstall.stderr
+        throw MarkitdownInstallerError.installationFailed(
+            pythonPath: pythonPath,
+            stderr: finalError
+        )
     }
 }

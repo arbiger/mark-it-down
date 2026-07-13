@@ -39,24 +39,14 @@ final class ItemDropDelegate: NSObject {
         let group = DispatchGroup()
         var urls: [URL] = []
         let lock = NSLock()
-        let group_lock = NSLock()
-        var remaining = providers.count
 
         for provider in providers {
             guard provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) else {
-                group_lock.lock()
-                remaining -= 1
-                group_lock.unlock()
                 continue
             }
             group.enter()
             provider.loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
-                defer {
-                    group.leave()
-                    group_lock.lock()
-                    remaining -= 1
-                    group_lock.unlock()
-                }
+                defer { group.leave() }
                 var url: URL?
                 if let data = item as? Data {
                     url = URL(dataRepresentation: data, relativeTo: nil)

@@ -6,7 +6,9 @@
 
 **Architecture:** Preserve the SwiftUI/AppKit surface and current value-model structure. Strengthen the existing focused core types and add only the seams needed for deterministic tests.
 
-**Tech Stack:** Swift 5.9 package manifest, Swift 6.3 toolchain, SwiftUI, AppKit, Foundation `Process`, structured concurrency, XCTest, macOS 14+.
+**Tech Stack:** Swift 5.9 package manifest, Swift 6.3 toolchain, SwiftUI, AppKit, Foundation `Process`, structured concurrency, a native framework-free test runner, macOS 14+.
+
+> **Execution note:** The installed Command Line Tools could compile but not discover Swift Testing tests and did not expose XCTest. Execution therefore replaced the planned XCTest target with a framework-free `run-tests.sh` harness that compiles production sources and tests into one native executable. All behavioral test steps use that command.
 
 ## Global Constraints
 

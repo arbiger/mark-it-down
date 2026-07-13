@@ -11,8 +11,9 @@ Powered by [microsoft/markitdown](https://github.com/microsoft/markitdown) (MIT)
 - Drag-and-drop a **folder** (recursive scan) or a **single file** (its parent folder is scanned)
 - Supports PDF, DOCX, PPTX, XLSX, HTML, EPUB, CSV, JSON, XML, images (with OCR), audio (with transcription), and more
 - Output written next to each source — `foo.pdf` becomes `foo.md` in the same folder
-- Never overwrites: existing `foo.md` gets `foo(1).md`, then `foo(2).md`, etc.
+- Never overwrites: existing and same-batch collisions get `(N)` suffixes
 - Up to 4 parallel conversions via Swift `actor` + `TaskGroup`
+- Stop cancels active subprocesses instead of leaving conversions running
 - Native SwiftUI, no Electron
 
 ## Requirements
@@ -43,11 +44,9 @@ Drag `Mark-It-Down.app` to `/Applications` if you want it permanently installed.
 On first launch the app:
 
 1. Probes candidate Python 3.10+ installs (Homebrew Apple Silicon / Intel, python.org framework, `/usr/bin/python3`)
-2. For each candidate, tries `python -c "import markitdown"` — picks the first that already has it
+2. For each candidate, tries `python -c "import markitdown"` — a broken candidate does not block the next one
 3. If none do, runs `pip install --user --break-system-packages 'markitdown[all]'` automatically (`--break-system-packages` is needed because Homebrew Python 3.11+ is externally-managed per PEP 668)
 4. Falls back to system-wide install if `--user` fails
-
-If you have markitdown in a venv (e.g. `/tmp/markitdown-work/venv`), the app detects and uses it — no reinstall.
 
 ## Usage
 
@@ -62,20 +61,23 @@ If you have markitdown in a venv (e.g. `/tmp/markitdown-work/venv`), the app det
 
 ```bash
 ./run-dev.sh      # swift run for development
+./run-tests.sh    # compile and run the native core test suite
 swift build       # compile only
 ```
 
-This repo has **no automated tests** because the host that built it (macOS CommandLineTools) doesn't include XCTest — install full Xcode if you want `swift test` to work.
+The test runner is intentionally framework-free because Apple Command Line Tools on this host does not expose a usable XCTest/Swift Testing runner. It compiles the production sources (excluding the app entry point) together with the tests, then runs the resulting executable. No full Xcode install or third-party dependency is required.
 
 ## Project structure
 
 ```
 Mark-It-Down/
 ├── Package.swift                          SwiftPM macOS executable
-├── Sources/MarkItDown/                    App code (~12 files, ~700 lines)
+├── Sources/MarkItDown/                    App and conversion-engine code
+├── Tests/MarkItDownTests/                 Native automated core tests
 ├── Resources/                             Info.plist template, AppIcon.icns
 ├── make-app.sh                            build → wrap into .app → codesign
 ├── run-dev.sh                             swift run wrapper
+├── run-tests.sh                           compile and run automated tests
 ├── README.md                              this file
 └── LICENSE                                MIT
 ```

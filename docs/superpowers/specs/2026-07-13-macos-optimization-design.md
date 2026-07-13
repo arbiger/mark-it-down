@@ -58,7 +58,7 @@ Array copying will be kept proportional to the small value-model architecture. A
 
 ## Testing
 
-Add a SwiftPM test target and use XCTest supplied by the current Swift toolchain. Tests will cover:
+Use a small native Swift test executable compiled by `run-tests.sh`. The installed Command Line Tools contains neither a usable XCTest module nor a compatible Swift Testing discovery runtime, so this framework-free runner provides repeatable coverage without full Xcode or a third-party dependency. Tests cover:
 
 - supported-extension matching;
 - unique output naming against disk and within a batch;
@@ -75,7 +75,7 @@ Production changes follow red-green-refactor: each behavior gets a failing test 
 
 Completion requires fresh evidence from:
 
-1. `swift test`
+1. `./run-tests.sh`
 2. `swift build -c debug`
 3. `swift build -c release`
 4. `./make-app.sh release`
