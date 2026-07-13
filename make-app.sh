@@ -21,6 +21,7 @@ mkdir -p "$BUNDLE/Contents/Resources"
 cp "$BIN_PATH/MarkItDown" "$BUNDLE/Contents/MacOS/$APP_NAME"
 chmod +x "$BUNDLE/Contents/MacOS/$APP_NAME"
 cp Resources/Info.plist.tmpl "$BUNDLE/Contents/Info.plist"
+cp Resources/AppIcon.icns "$BUNDLE/Contents/Resources/AppIcon.icns"
 
 echo "==> Ad-hoc codesigning"
 codesign --force --deep --sign - "$BUNDLE"

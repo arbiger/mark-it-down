@@ -19,14 +19,27 @@ enum PythonLocator {
             try await runVersionCheck(pythonURL: url)
         }
     ) async throws -> URL? {
+        try await locateAll(fileManager: fileManager, probePaths: probePaths, versionProvider: versionProvider).first
+    }
+
+    /// Returns ALL acceptable Python 3.10+ candidates, in probe order. Used by callers that
+    /// want to scan across multiple pythons (e.g. looking for one that already has markitdown).
+    static func locateAll(
+        fileManager: FileManager = .default,
+        probePaths: [URL] = PythonLocator.defaultProbePaths,
+        versionProvider: @escaping (URL) async throws -> String? = { url in
+            try await runVersionCheck(pythonURL: url)
+        }
+    ) async throws -> [URL] {
+        var found: [URL] = []
         for path in probePaths {
             guard fileManager.isExecutableFile(atPath: path.path) else { continue }
             guard let versionString = try? await versionProvider(path) else { continue }
             if isAcceptable(versionString) {
-                return path
+                found.append(path)
             }
         }
-        return nil
+        return found
     }
 
     static func isAcceptable(_ version: String) -> Bool {

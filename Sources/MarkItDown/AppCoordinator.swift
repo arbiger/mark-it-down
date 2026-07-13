@@ -27,22 +27,23 @@ final class AppCoordinator {
 
     func bootstrap() async {
         do {
-            let pythonPath = try await PythonLocator.locate()
-            guard let pythonPath = pythonPath else {
+            let candidates = try await PythonLocator.locateAll()
+            guard !candidates.isEmpty else {
                 state.mode = .noPython
                 await logger?.log("WARN", "No suitable Python 3.10+ found")
                 return
             }
-            state.pythonPath = pythonPath
-            state.mode = .installing(progress: "Checking markitdown…")
-            let installed = try await MarkitdownInstaller.ensureInstalled(pythonPath: pythonPath)
-            if installed {
+            state.mode = .installing(progress: "Looking for existing markitdown…")
+            let chosen = try await MarkitdownInstaller.findOrInstall(candidates: candidates)
+            if let chosen {
+                state.pythonPath = chosen
                 state.mode = .empty
-                await logger?.log("INFO", "Bootstrap complete: \(pythonPath.path)")
+                await logger?.log("INFO", "Bootstrap complete: \(chosen.path)")
             } else {
+                let first = candidates.first!.path
                 state.mode = .installFailed(
                     "Could not install markitdown. Run manually:\n" +
-                    "\(pythonPath.path) -m pip install --user 'markitdown[all]'"
+                    "\(first) -m pip install --user --break-system-packages 'markitdown[all]'"
                 )
             }
         } catch {
