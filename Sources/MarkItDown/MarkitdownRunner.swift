@@ -8,6 +8,16 @@ enum MarkitdownRunnerError: Error {
     case nonZeroExit(code: Int32, stderr: String)
 }
 
+extension MarkitdownRunnerError: LocalizedError {
+    var errorDescription: String? {
+        switch self {
+        case .nonZeroExit(let code, let stderr):
+            let details = stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+            return details.isEmpty ? "markitdown exited with code \(code)" : details
+        }
+    }
+}
+
 struct MarkitdownRunner: MarkitdownRunning {
     private let runner: CommandRunner
 

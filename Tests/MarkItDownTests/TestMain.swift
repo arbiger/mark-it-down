@@ -4,7 +4,9 @@ import Foundation
 @main
 enum TestMain {
     static func main() async {
-        let tests = OutputAndScannerTests.all + SystemCommandRunnerTests.all
+        let tests = OutputAndScannerTests.all
+            + SystemCommandRunnerTests.all
+            + ConversionEngineTests.all
         var failures = 0
 
         for test in tests {

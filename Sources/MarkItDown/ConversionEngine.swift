@@ -18,10 +18,11 @@ actor ConversionEngine {
             var inFlight = 0
             var iterator = job.files.makeIterator()
 
-            while let file = iterator.next() {
+            while !Task.isCancelled, let file = iterator.next() {
                 if inFlight >= maxConcurrent {
                     await group.next()
                     inFlight -= 1
+                    if Task.isCancelled { break }
                 }
                 inFlight += 1
                 let id = file.id
@@ -30,16 +31,21 @@ actor ConversionEngine {
                 let runner = self.markitdown
 
                 group.addTask {
-                    await update(id, .running)
                     do {
+                        try Task.checkCancellation()
+                        await update(id, .running)
                         try await runner.convert(pythonPath: pythonPath, source: source, output: output)
+                        try Task.checkCancellation()
                         await update(id, .done)
+                    } catch is CancellationError {
+                        await update(id, .cancelled)
                     } catch {
-                        let msg = (error as? MarkitdownRunnerError).map { String(describing: $0) }
-                            ?? String(describing: error)
-                        await update(id, .failed(msg))
+                        await update(id, .failed(error.localizedDescription))
                     }
                 }
+            }
+            if Task.isCancelled {
+                group.cancelAll()
             }
             await group.waitForAll()
         }

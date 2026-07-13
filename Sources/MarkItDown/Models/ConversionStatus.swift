@@ -5,4 +5,5 @@ enum ConversionStatus: Equatable {
     case running
     case done
     case failed(String)
+    case cancelled
 }

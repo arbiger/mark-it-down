@@ -175,6 +175,7 @@ struct ContentView: View {
         case .running: ProgressView().controlSize(.small)
         case .done: Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
         case .failed: Image(systemName: "xmark.circle.fill").foregroundStyle(.red)
+        case .cancelled: Image(systemName: "stop.circle").foregroundStyle(.secondary)
         }
     }
 }
