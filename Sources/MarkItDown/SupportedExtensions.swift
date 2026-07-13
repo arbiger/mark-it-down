@@ -3,7 +3,7 @@ import Foundation
 enum SupportedExtensions {
     static let all: Set<String> = [
         "pdf", "docx", "pptx", "xlsx", "xls",
-        "html", "htm", "txt", "md", "rtf",
+        "html", "htm", "txt", "rtf",
         "epub", "csv", "json", "xml",
         "png", "jpg", "jpeg", "gif", "webp",
         "mp3", "wav", "m4a", "zip"

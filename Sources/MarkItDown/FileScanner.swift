@@ -14,21 +14,29 @@ enum FileScanner {
         guard let enumerator = fileManager.enumerator(
             at: root,
             includingPropertiesForKeys: [.isRegularFileKey],
-            options: [.skipsHiddenFiles]
+            options: [.skipsHiddenFiles, .skipsPackageDescendants]
         ) else {
             return []
         }
 
-        var sources: [SourceFile] = []
+        var sourceURLs: [URL] = []
         for case let url as URL in enumerator {
             guard SupportedExtensions.isSupported(url) else { continue }
             let values = try? url.resourceValues(forKeys: [.isRegularFileKey])
             guard values?.isRegularFile == true else { continue }
-
-            let desired = url.deletingPathExtension().appendingPathExtension("md")
-            let outputURL = OutputNamer.nextAvailable(for: desired, fileManager: fileManager)
-            sources.append(SourceFile(sourceURL: url, outputURL: outputURL))
+            sourceURLs.append(url)
         }
-        return sources
+
+        sourceURLs.sort { $0.path < $1.path }
+        var reservedOutputs: Set<URL> = []
+        return sourceURLs.map { sourceURL in
+            let desired = sourceURL.deletingPathExtension().appendingPathExtension("md")
+            let outputURL = OutputNamer.nextAvailable(
+                for: desired,
+                fileManager: fileManager,
+                reserving: &reservedOutputs
+            )
+            return SourceFile(sourceURL: sourceURL, outputURL: outputURL)
+        }
     }
 }
