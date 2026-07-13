@@ -1,12 +1,12 @@
 import Foundation
 
-struct CommandRunnerResult {
+struct CommandRunnerResult: Sendable {
     let exitCode: Int32
     let stdout: String
     let stderr: String
 }
 
-protocol CommandRunner {
+protocol CommandRunner: Sendable {
     func run(executable: URL, arguments: [String]) async throws -> CommandRunnerResult
 }
 

@@ -1,6 +1,6 @@
 import Foundation
 
-struct SourceFile: Identifiable, Equatable {
+struct SourceFile: Identifiable, Equatable, Sendable {
     let id: UUID
     let sourceURL: URL
     let outputURL: URL

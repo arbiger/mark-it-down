@@ -12,7 +12,7 @@ actor ConversionEngine {
     func run(
         job: FolderJob,
         pythonPath: URL,
-        update: @MainActor @escaping (UUID, ConversionStatus) async -> Void
+        update: @MainActor @Sendable @escaping (UUID, ConversionStatus) async -> Void
     ) async {
         await withTaskGroup(of: Void.self) { group in
             var inFlight = 0

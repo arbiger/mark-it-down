@@ -1,10 +1,10 @@
 import Foundation
 
-protocol MarkitdownRunning {
+protocol MarkitdownRunning: Sendable {
     func convert(pythonPath: URL, source: URL, output: URL) async throws
 }
 
-enum MarkitdownRunnerError: Error {
+enum MarkitdownRunnerError: Error, Sendable {
     case nonZeroExit(code: Int32, stderr: String)
 }
 

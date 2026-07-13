@@ -1,6 +1,6 @@
 import Foundation
 
-enum ConversionStatus: Equatable {
+enum ConversionStatus: Equatable, Sendable {
     case pending
     case running
     case done

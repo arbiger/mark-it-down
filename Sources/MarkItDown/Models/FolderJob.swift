@@ -1,6 +1,6 @@
 import Foundation
 
-struct FolderJob: Equatable {
+struct FolderJob: Equatable, Sendable {
     let rootURL: URL
     var files: [SourceFile]
 
@@ -17,7 +17,7 @@ struct FolderJob: Equatable {
     }
 }
 
-struct ConversionCounts: Equatable {
+struct ConversionCounts: Equatable, Sendable {
     var pending = 0
     var running = 0
     var succeeded = 0

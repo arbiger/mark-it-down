@@ -2,6 +2,24 @@ import AppKit
 import UniformTypeIdentifiers
 import SwiftUI
 
+private final class DroppedURLBuffer: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage: [URL] = []
+
+    func append(_ url: URL) {
+        lock.lock()
+        storage.append(url)
+        lock.unlock()
+    }
+
+    func snapshot() -> [URL] {
+        lock.lock()
+        defer { lock.unlock() }
+        return storage
+    }
+}
+
+@MainActor
 final class ItemDropDelegate: NSObject {
     var onRoot: ((URL) -> Void)?
 
@@ -28,17 +46,14 @@ final class ItemDropDelegate: NSObject {
         }
         guard let root = root else { return }
 
-        DispatchQueue.main.async { [weak self] in
-            self?.onRoot?(root)
-        }
+        onRoot?(root)
     }
 
     /// ItemProvider-driven entry point for SwiftUI's `.onDrop`.
     func validateAndExtract(from providers: [NSItemProvider]) {
         guard !providers.isEmpty else { return }
         let group = DispatchGroup()
-        var urls: [URL] = []
-        let lock = NSLock()
+        let urls = DroppedURLBuffer()
 
         for provider in providers {
             guard provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) else {
@@ -54,15 +69,13 @@ final class ItemDropDelegate: NSObject {
                     url = direct
                 }
                 if let resolved = url {
-                    lock.lock()
                     urls.append(resolved)
-                    lock.unlock()
                 }
             }
         }
 
         group.notify(queue: .main) { [weak self] in
-            self?.acceptDroppedItems(urls)
+            self?.acceptDroppedItems(urls.snapshot())
         }
     }
 }
