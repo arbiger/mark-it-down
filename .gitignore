@@ -1,0 +1,7 @@
+.build/
+.swiftpm/
+Mark-It-Down.app/
+*.xcodeproj/
+DerivedData/
+.DS_Store
+*.log
