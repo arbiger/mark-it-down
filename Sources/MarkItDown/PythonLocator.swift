@@ -52,7 +52,7 @@ enum PythonLocator {
             process.standardError = pipe
             process.terminationHandler = { proc in
                 let data = (try? pipe.fileHandleForReading.readToEnd()) ?? Data()
-                let s = String(data: data ?? Data(), encoding: .utf8)?
+                let s = String(data: data, encoding: .utf8)?
                     .trimmingCharacters(in: .whitespacesAndNewlines)
                 cont.resume(returning: s)
             }
