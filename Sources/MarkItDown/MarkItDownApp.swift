@@ -11,7 +11,7 @@ struct MarkItDownApp: App {
             ContentView(
                 state: state,
                 dropDelegate: dropDelegate,
-                onPickFolder: { coordinator?.pickFolder() },
+                onPickItems: { coordinator?.pickItems() },
                 onStart: { coordinator?.startConversion() },
                 onStop: { coordinator?.stopConversion() },
                 onShowInFinder: { coordinator?.showInFinder() },
@@ -28,8 +28,8 @@ struct MarkItDownApp: App {
     private func initialBootstrap() async {
         let coord = AppCoordinator(state: state, dropDelegate: dropDelegate)
         self.coordinator = coord
-        dropDelegate.onRoot = { [weak coord] url in
-            coord?.loadFolder(url)
+        dropDelegate.onItems = { [weak coord] urls in
+            coord?.loadItems(urls)
         }
         await coord.bootstrap()
     }

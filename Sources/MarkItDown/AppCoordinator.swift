@@ -54,18 +54,24 @@ final class AppCoordinator {
         }
     }
 
-    func pickFolder() {
+    func pickItems() {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        panel.prompt = "Select"
-        if panel.runModal() == .OK, let url = panel.url {
-            loadFolder(url)
+        panel.canChooseFiles = true
+        panel.allowsMultipleSelection = true
+        panel.prompt = "Choose"
+        panel.message = "Choose one or more files or folders to convert"
+        if panel.runModal() == .OK, !panel.urls.isEmpty {
+            loadItems(panel.urls)
         }
     }
 
     func loadFolder(_ url: URL) {
+        loadItems([url])
+    }
+
+    func loadItems(_ urls: [URL]) {
+        guard !urls.isEmpty else { return }
         scanTask?.cancel()
         let scanID = UUID()
         activeScanID = scanID
@@ -73,14 +79,14 @@ final class AppCoordinator {
 
         scanTask = Task { @MainActor [weak self] in
             do {
-                let files = try await Task.detached(priority: .userInitiated) {
-                    try FileScanner.scan(root: url)
+                let result = try await Task.detached(priority: .userInitiated) {
+                    try FileScanner.scan(items: urls)
                 }.value
                 try Task.checkCancellation()
                 guard let self, self.activeScanID == scanID else { return }
                 self.activeScanID = nil
                 self.scanTask = nil
-                self.state.job = FolderJob(rootURL: url, files: files)
+                self.state.job = FolderJob(rootURL: result.rootURL, files: result.files)
                 self.state.mode = .preview
             } catch is CancellationError {
                 return
@@ -131,8 +137,11 @@ final class AppCoordinator {
     }
 
     func showInFinder() {
-        guard let url = state.job?.rootURL else { return }
-        NSWorkspace.shared.activateFileViewerSelecting([url])
+        guard let job = state.job else { return }
+        let outputs = job.files.map(\.outputURL).filter {
+            FileManager.default.fileExists(atPath: $0.path)
+        }
+        NSWorkspace.shared.activateFileViewerSelecting(outputs.isEmpty ? [job.rootURL] : outputs)
     }
 
     func reset() {

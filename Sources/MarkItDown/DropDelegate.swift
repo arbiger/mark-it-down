@@ -21,32 +21,15 @@ private final class DroppedURLBuffer: @unchecked Sendable {
 
 @MainActor
 final class ItemDropDelegate: NSObject {
-    var onRoot: ((URL) -> Void)?
+    var onItems: (([URL]) -> Void)?
 
-    /// Accept a folder or file (or mix of multiple items) and resolve them to a single
-    /// root folder URL. Recursively walks the folder via FileScanner downstream.
-    /// - Folder drop → that folder is the root
-    /// - File drop → the file's parent folder is the root
-    /// - Multi-file drop → the common parent is the root
+    /// Preserve the exact dropped selection. FileScanner expands directories later,
+    /// while explicitly selected files are converted without scanning their siblings.
     func acceptDroppedItems(_ items: [URL]) {
-        guard !items.isEmpty else { return }
-        let fm = FileManager.default
-
-        let root: URL?
-        if let firstFolder = items.first(where: {
-            var isDir: ObjCBool = false
-            return fm.fileExists(atPath: $0.path, isDirectory: &isDir) && isDir.boolValue
-        }) {
-            // A folder was dropped — use it.
-            root = firstFolder
-        } else {
-            // Files only — use common parent (or first file's parent if mixed).
-            let parents = Set(items.map { $0.deletingLastPathComponent() })
-            root = parents.first
-        }
-        guard let root = root else { return }
-
-        onRoot?(root)
+        let uniqueItems = Array(Set(items.map(\.standardizedFileURL)))
+            .sorted { $0.path < $1.path }
+        guard !uniqueItems.isEmpty else { return }
+        onItems?(uniqueItems)
     }
 
     /// ItemProvider-driven entry point for SwiftUI's `.onDrop`.

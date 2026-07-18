@@ -3,7 +3,7 @@ import SwiftUI
 struct ContentView: View {
     @Bindable var state: AppState
     let dropDelegate: ItemDropDelegate
-    let onPickFolder: () -> Void
+    let onPickItems: () -> Void
     let onStart: () -> Void
     let onStop: () -> Void
     let onShowInFinder: () -> Void
@@ -32,7 +32,7 @@ struct ContentView: View {
     private var content: some View {
         switch state.mode {
         case .empty:
-            dropZone(message: "Drop a folder here\nor click to pick")
+            dropZone(message: "Drop files or folders here\nor click to choose")
         case .scanning:
             scanningView
         case .scanFailed(let message):
@@ -61,9 +61,9 @@ struct ContentView: View {
 
     private func scanFailedView(message: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Could not scan folder").font(.headline).foregroundStyle(.red)
+            Text("Could not scan selection").font(.headline).foregroundStyle(.red)
             Text(message).font(.caption).foregroundStyle(.secondary)
-            Button("Choose another folder") { onPickFolder() }
+            Button("Choose other items") { onPickItems() }
         }
     }
 
@@ -97,6 +97,25 @@ struct ContentView: View {
             Text("Done").font(.title2).bold()
             Text("\(succeeded) succeeded · \(failed) failed")
                 .font(.callout).foregroundStyle(.secondary)
+            if failed > 0, let failedFiles = state.job?.files.filter({ file in
+                if case .failed = file.status { return true }
+                return false
+            }) {
+                List(failedFiles) { file in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(file.sourceURL.lastPathComponent).font(.callout).bold()
+                        if let message = file.errorMessage {
+                            Text(message)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+                .listStyle(.inset)
+                .frame(minHeight: 180)
+            }
         }
     }
 
@@ -107,7 +126,7 @@ struct ContentView: View {
             case .empty, .scanning, .scanFailed, .noPython, .installing, .installFailed:
                 EmptyView()
             case .preview:
-                Button("Change folder") { onPickFolder() }
+                Button("Change selection") { onPickItems() }
                 Spacer()
                 Button("Start") { onStart() }
                     .keyboardShortcut(.defaultAction)
@@ -118,7 +137,7 @@ struct ContentView: View {
             case .done:
                 Button("Show in Finder") { onShowInFinder() }
                 Spacer()
-                Button("Convert another folder") { onConvertAnother() }
+                Button("Convert other items") { onConvertAnother() }
             }
         }
     }
@@ -136,7 +155,7 @@ struct ContentView: View {
             .padding()
         }
         .frame(maxWidth: .infinity, minHeight: 220)
-        .onTapGesture { onPickFolder() }
+        .onTapGesture { onPickItems() }
         .onDrop(of: [.fileURL], delegate: dropDelegate)
     }
 

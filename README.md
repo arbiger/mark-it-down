@@ -1,6 +1,6 @@
 # Mark-It-Down
 
-A native macOS app that converts documents to Markdown using [microsoft/markitdown](https://github.com/microsoft/markitdown). Drag a folder or a single file onto the window, click **Start**, and the `.md` files land next to the originals.
+A native macOS app that converts documents to Markdown using [microsoft/markitdown](https://github.com/microsoft/markitdown). Drag one or more files, folders, or a mixture onto the window, click **Start**, and the `.md` files land next to the originals.
 
 This is a personal-use SwiftUI wrapper around the `markitdown` Python CLI. It exists to make batch conversions frictionless: drop, click, done. Outputs never overwrite — collisions get `(N)` suffixes.
 
@@ -8,10 +8,11 @@ Powered by [microsoft/markitdown](https://github.com/microsoft/markitdown) (MIT)
 
 ## What it does
 
-- Drag-and-drop a **folder** (recursive scan) or a **single file** (its parent folder is scanned)
+- Drag-and-drop one or more **files** (only those files are selected), **folders** (recursive scan), or a mixture of both
 - Supports PDF, DOCX, PPTX, XLSX, HTML, EPUB, CSV, JSON, XML, images (with OCR), audio (with transcription), and more
 - Output written next to each source — `foo.pdf` becomes `foo.md` in the same folder
 - Never overwrites: existing and same-batch collisions get `(N)` suffixes
+- Detects empty conversions and explains when a PDF needs OCR or selectable text
 - Up to 4 parallel conversions via Swift `actor` + `TaskGroup`
 - Stop cancels active subprocesses instead of leaving conversions running
 - Native SwiftUI, no Electron
