@@ -10,6 +10,7 @@ enum TestMain {
             + FolderJobTests.all
             + AppCoordinatorTests.all
             + BootstrapTests.all
+            + HybridConversionTests.all
         var failures = 0
 
         for test in tests {

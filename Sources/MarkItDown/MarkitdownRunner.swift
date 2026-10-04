@@ -1,6 +1,6 @@
 import Foundation
 
-protocol MarkitdownRunning: Sendable {
+protocol DocumentConverting: Sendable {
     func convert(pythonPath: URL, source: URL, output: URL) async throws
 }
 
@@ -27,7 +27,7 @@ extension MarkitdownRunnerError: LocalizedError {
     }
 }
 
-struct MarkitdownRunner: MarkitdownRunning {
+struct MarkitdownRunner: DocumentConverting {
     private let runner: CommandRunner
 
     init(runner: CommandRunner = SystemCommandRunner()) {
@@ -35,24 +35,26 @@ struct MarkitdownRunner: MarkitdownRunning {
     }
 
     func convert(pythonPath: URL, source: URL, output: URL) async throws {
+        let temporary = output.deletingLastPathComponent().appendingPathComponent(".\(output.lastPathComponent).tmp-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: temporary) }
         let result = try await runner.run(
             executable: pythonPath,
-            arguments: ["-m", "markitdown", source.path, "-o", output.path]
+            arguments: ["-m", "markitdown", source.path, "-o", temporary.path]
         )
         if result.exitCode != 0 {
             throw MarkitdownRunnerError.nonZeroExit(code: result.exitCode, stderr: result.stderr)
         }
 
-        guard FileManager.default.fileExists(atPath: output.path) else {
+        guard FileManager.default.fileExists(atPath: temporary.path) else {
             throw MarkitdownRunnerError.missingOutput
         }
 
-        let markdown = try String(contentsOf: output, encoding: .utf8)
+        let markdown = try String(contentsOf: temporary, encoding: .utf8)
         guard !markdown.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            try? FileManager.default.removeItem(at: output)
             throw MarkitdownRunnerError.noExtractableContent(
                 isPDF: source.pathExtension.lowercased() == "pdf"
             )
         }
+        try FileManager.default.moveItem(at: temporary, to: output)
     }
 }

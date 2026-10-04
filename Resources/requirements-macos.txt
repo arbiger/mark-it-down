@@ -1,0 +1,2 @@
+markitdown[all]==0.1.7
+pdf-inspector==0.2.6

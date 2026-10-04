@@ -22,6 +22,8 @@ cp "$BIN_PATH/MarkItDown" "$BUNDLE/Contents/MacOS/$APP_NAME"
 chmod +x "$BUNDLE/Contents/MacOS/$APP_NAME"
 cp Resources/Info.plist.tmpl "$BUNDLE/Contents/Info.plist"
 cp Resources/AppIcon.icns "$BUNDLE/Contents/Resources/AppIcon.icns"
+cp Resources/markitdown_pdf_inspector.py "$BUNDLE/Contents/Resources/markitdown_pdf_inspector.py"
+cp Resources/requirements-macos.txt "$BUNDLE/Contents/Resources/requirements-macos.txt"
 
 echo "==> Ad-hoc codesigning"
 codesign --force --deep --sign - "$BUNDLE"

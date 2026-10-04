@@ -6,7 +6,15 @@ enum PythonLocatorError: Error {
 
 enum PythonLocator {
     static let defaultProbePaths: [URL] = [
+        URL(fileURLWithPath: "/opt/homebrew/bin/python3.13"),
+        URL(fileURLWithPath: "/opt/homebrew/bin/python3.12"),
+        URL(fileURLWithPath: "/opt/homebrew/bin/python3.11"),
+        URL(fileURLWithPath: "/opt/homebrew/bin/python3.10"),
         URL(fileURLWithPath: "/opt/homebrew/bin/python3"),
+        URL(fileURLWithPath: "/usr/local/bin/python3.13"),
+        URL(fileURLWithPath: "/usr/local/bin/python3.12"),
+        URL(fileURLWithPath: "/usr/local/bin/python3.11"),
+        URL(fileURLWithPath: "/usr/local/bin/python3.10"),
         URL(fileURLWithPath: "/usr/local/bin/python3"),
         URL(fileURLWithPath: "/Library/Frameworks/Python.framework/Versions/Current/bin/python3"),
         URL(fileURLWithPath: "/usr/bin/python3")
@@ -51,8 +59,7 @@ enum PythonLocator {
               let minor = Int(parts[1]) else {
             return false
         }
-        if major > 3 { return true }
-        return major == 3 && minor >= 10
+        return major == 3 && (10...13).contains(minor)
     }
 
     private static func runVersionCheck(pythonURL: URL) async throws -> String? {

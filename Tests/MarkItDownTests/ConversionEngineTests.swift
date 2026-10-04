@@ -1,6 +1,6 @@
 import Foundation
 
-actor ControlledMarkitdownRunner: MarkitdownRunning {
+actor ControlledMarkitdownRunner: DocumentConverting {
     private(set) var started: [String] = []
     private(set) var peakConcurrent = 0
     private var concurrent = 0

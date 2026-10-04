@@ -1,10 +1,10 @@
 import Foundation
 
 actor ConversionEngine {
-    private let markitdown: MarkitdownRunning
+    private let markitdown: DocumentConverting
     private let maxConcurrent: Int
 
-    init(markitdown: MarkitdownRunning, maxConcurrent: Int = 4) {
+    init(markitdown: DocumentConverting, maxConcurrent: Int = 4) {
         self.markitdown = markitdown
         self.maxConcurrent = max(1, maxConcurrent)
     }

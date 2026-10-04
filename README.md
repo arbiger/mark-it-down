@@ -1,18 +1,20 @@
 # Mark-It-Down
 
-A native macOS app that converts documents to Markdown using [microsoft/markitdown](https://github.com/microsoft/markitdown). Drag one or more files, folders, or a mixture onto the window, click **Start**, and the `.md` files land next to the originals.
+A native macOS app that converts documents to Markdown using [Firecrawl PDF Inspector](https://github.com/firecrawl/pdf-inspector) for PDFs and [Microsoft MarkItDown](https://github.com/microsoft/markitdown) for other supported formats. Drag one or more files, folders, or a mixture onto the window, click **Start**, and the `.md` files land next to the originals.
 
-This is a personal-use SwiftUI wrapper around the `markitdown` Python CLI. It exists to make batch conversions frictionless: drop, click, done. Outputs never overwrite — collisions get `(N)` suffixes.
+This is a personal-use SwiftUI app with a local hybrid conversion backend. It exists to make batch conversions frictionless: drop, click, done. Outputs never overwrite — collisions get `(N)` suffixes.
 
-Powered by [microsoft/markitdown](https://github.com/microsoft/markitdown) (MIT). This project is **not** affiliated with or endorsed by Microsoft; the app name is hyphenated to make that distinction clear.
+Both upstream engines are MIT-licensed. This project is **not** affiliated with or endorsed by Microsoft or Firecrawl; see `THIRD_PARTY_NOTICES.md`.
 
 ## What it does
 
 - Drag-and-drop one or more **files** (only those files are selected), **folders** (recursive scan), or a mixture of both
-- Supports PDF, DOCX, PPTX, XLSX, HTML, EPUB, CSV, JSON, XML, images (with OCR), audio (with transcription), and more
+- Routes native-text PDFs through fast, local PDF Inspector extraction
+- Rejects scanned, image-only, or mixed PDFs that need OCR instead of silently writing incomplete Markdown
+- Uses MarkItDown for DOCX, PPTX, XLSX, HTML, EPUB, CSV, JSON, XML, images, audio, archives, and other supported formats
 - Output written next to each source — `foo.pdf` becomes `foo.md` in the same folder
 - Never overwrites: existing and same-batch collisions get `(N)` suffixes
-- Detects empty conversions and explains when a PDF needs OCR or selectable text
+- Detects empty conversions and reports the PDF pages that need OCR when available
 - Up to 4 parallel conversions via Swift `actor` + `TaskGroup`
 - Stop cancels active subprocesses instead of leaving conversions running
 - Native SwiftUI, no Electron
@@ -20,8 +22,8 @@ Powered by [microsoft/markitdown](https://github.com/microsoft/markitdown) (MIT)
 ## Requirements
 
 - macOS 14 (Sonoma) or later
-- Python 3.10+ somewhere on the system (Homebrew recommended, or any venv)
-- Internet access on first run if markitdown isn't already installed anywhere
+- Python 3.10–3.13 somewhere on the system (Homebrew recommended, or any venv)
+- Internet access on first run to prepare the app-private conversion environment
 
 ## Install
 
@@ -44,10 +46,12 @@ Drag `Mark-It-Down.app` to `/Applications` if you want it permanently installed.
 
 On first launch the app:
 
-1. Probes candidate Python 3.10+ installs (Homebrew Apple Silicon / Intel, python.org framework, `/usr/bin/python3`)
-2. For each candidate, tries `python -c "import markitdown"` — a broken candidate does not block the next one
-3. If none do, runs `pip install --user --break-system-packages 'markitdown[all]'` automatically (`--break-system-packages` is needed because Homebrew Python 3.11+ is externally-managed per PEP 668)
-4. Falls back to system-wide install if `--user` fails
+1. Locates a Python 3.10–3.13 interpreter to create a virtual environment. Python 3.14 is currently excluded because the pinned MarkItDown dependency set does not install successfully on it.
+2. Creates or repairs `~/Library/Application Support/Mark-It-Down/runtime/venv`.
+3. Installs the direct pins from `Resources/requirements-macos.txt`: `markitdown[all]==0.1.7` and `pdf-inspector==0.2.6`.
+4. Verifies both exact versions before enabling conversion.
+
+The app does not install into user-global or system Python. Once the private environment is ready, ordinary local conversions can run offline. A later dependency repair or reinstall requires internet access.
 
 ## Usage
 
@@ -74,8 +78,15 @@ The test runner is intentionally framework-free because Apple Command Line Tools
 Mark-It-Down/
 ├── Package.swift                          SwiftPM macOS executable
 ├── Sources/MarkItDown/                    App and conversion-engine code
-├── Tests/MarkItDownTests/                 Native automated core tests
+├── Tests/
+│   ├── MarkItDownTests/                 Native automated core tests
+│   └── ManualFixtures/                  ignored large/private manual fixtures
 ├── Resources/                             Info.plist template, AppIcon.icns
+│   ├── markitdown_pdf_inspector.py     Versioned PDF helper contract
+│   └── requirements-macos.txt          Direct dependency pins
+├── scripts/                               Metadata-only benchmark harness
+├── docs/                                  Designs, plans, and benchmark evidence
+├── dist/                                  ignored local release artifacts
 ├── make-app.sh                            build → wrap into .app → codesign
 ├── run-dev.sh                             swift run wrapper
 ├── run-tests.sh                           compile and run automated tests
@@ -86,8 +97,9 @@ Mark-It-Down/
 ## Credits
 
 - [microsoft/markitdown](https://github.com/microsoft/markitdown) — the conversion engine, MIT-licensed
+- [firecrawl/pdf-inspector](https://github.com/firecrawl/pdf-inspector) — PDF classification and structured extraction, MIT-licensed
 - App icon: gradient "MARK" document logo, original to this repo
 
 ## License
 
-MIT. See `LICENSE`.
+MIT. See `LICENSE` and `THIRD_PARTY_NOTICES.md`.

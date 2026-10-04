@@ -10,21 +10,6 @@ protocol CommandRunner: Sendable {
     func run(executable: URL, arguments: [String]) async throws -> CommandRunnerResult
 }
 
-enum MarkitdownInstallerError: LocalizedError {
-    case installationFailed(pythonPath: URL, stderr: String)
-
-    var errorDescription: String? {
-        switch self {
-        case .installationFailed(let pythonPath, let stderr):
-            let details = stderr.trimmingCharacters(in: .whitespacesAndNewlines)
-            let command = "\(pythonPath.path) -m pip install --user "
-                + "--break-system-packages 'markitdown[all]'"
-            let prefix = details.isEmpty ? "Could not install markitdown." : details
-            return "\(prefix)\n\nRun manually:\n\(command)"
-        }
-    }
-}
-
 struct SystemCommandRunner: CommandRunner {
     func run(executable: URL, arguments: [String]) async throws -> CommandRunnerResult {
         try Task.checkCancellation()
@@ -70,75 +55,205 @@ struct SystemCommandRunner: CommandRunner {
     }
 }
 
+enum MarkitdownInstallerError: LocalizedError {
+    case preparationFailed(stage: String, pythonPath: URL, details: String)
+
+    var errorDescription: String? {
+        switch self {
+        case .preparationFailed(let stage, let pythonPath, let details):
+            let environment = pythonPath
+                .deletingLastPathComponent()
+                .deletingLastPathComponent()
+                .path
+            let trimmed = details.trimmingCharacters(in: .whitespacesAndNewlines)
+            let suffix = trimmed.isEmpty ? "" : " \(trimmed)"
+            return "Could not prepare the private Mark-It-Down environment at \(environment). \(stage) failed.\(suffix)"
+        }
+    }
+}
+
 enum MarkitdownInstaller {
-    /// Scan a list of candidate pythons for one that already has `markitdown` importable.
-    /// If none do, install markitdown into the first candidate. Returns the python URL to use,
-    /// or nil if no candidate is acceptable or install fails.
+    static let markitdownVersion = "0.1.7"
+    static let pdfInspectorVersion = "0.2.6"
+
+    private static let versionProbe = """
+    import importlib.metadata as metadata
+    ok = (
+        metadata.version("markitdown") == "\(markitdownVersion)"
+        and metadata.version("pdf-inspector") == "\(pdfInspectorVersion)"
+    )
+    raise SystemExit(0 if ok else 1)
+    """
+
+    static func appPrivatePython(baseURL: URL? = nil) -> URL {
+        let base = baseURL ?? FileManager.default
+            .urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Mark-It-Down/runtime", isDirectory: true)
+        return base.appendingPathComponent("venv/bin/python3")
+    }
+
     static func findOrInstall(
         candidates: [URL],
-        runner: CommandRunner = SystemCommandRunner()
+        runner: CommandRunner = SystemCommandRunner(),
+        baseURL: URL? = nil,
+        requirementsURL: URL? = nil,
+        fileManager: FileManager = .default
     ) async throws -> URL? {
-        // Pass 1: pick the first python where `import markitdown` works. This avoids copying
-        // when the user already has markitdown in a venv at e.g. /tmp/markitdown-work/venv.
-        for python in candidates {
+        guard let basePython = candidates.first else { return nil }
+
+        let privatePython = appPrivatePython(baseURL: baseURL)
+        let environmentRoot = privatePython
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let requirements = requirementsURL ?? defaultRequirementsURL()
+
+        if fileManager.fileExists(atPath: privatePython.path) {
             do {
                 let probe = try await runner.run(
-                    executable: python,
-                    arguments: ["-c", "import markitdown"]
+                    executable: privatePython,
+                    arguments: ["-c", versionProbe]
                 )
                 if probe.exitCode == 0 {
-                    return python
+                    return privatePython
                 }
             } catch is CancellationError {
                 throw CancellationError()
             } catch {
-                continue
+                // A damaged private environment is repaired below.
             }
         }
-        // Pass 2: install into the first candidate.
-        guard let python = candidates.first else { return nil }
-        let ok = try await ensureInstalled(pythonPath: python, runner: runner)
-        return ok ? python : nil
+
+        do {
+            try fileManager.createDirectory(
+                at: environmentRoot.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+        } catch {
+            throw failure(
+                stage: "Application Support directory creation",
+                pythonPath: privatePython,
+                details: error.localizedDescription
+            )
+        }
+
+        let createResult: CommandRunnerResult
+        do {
+            createResult = try await runner.run(
+                executable: basePython,
+                arguments: ["-m", "venv", "--clear", environmentRoot.path]
+            )
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            throw failure(
+                stage: "Virtual environment creation",
+                pythonPath: privatePython,
+                details: error.localizedDescription
+            )
+        }
+        guard createResult.exitCode == 0 else {
+            throw failure(
+                stage: "Virtual environment creation",
+                pythonPath: privatePython,
+                result: createResult
+            )
+        }
+
+        let installResult: CommandRunnerResult
+        do {
+            installResult = try await runner.run(
+                executable: privatePython,
+                arguments: [
+                    "-m", "pip", "install",
+                    "--disable-pip-version-check",
+                    "--upgrade",
+                    "-r", requirements.path
+                ]
+            )
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            throw failure(
+                stage: "Pinned dependency installation",
+                pythonPath: privatePython,
+                details: error.localizedDescription
+            )
+        }
+        guard installResult.exitCode == 0 else {
+            throw failure(
+                stage: "Pinned dependency installation",
+                pythonPath: privatePython,
+                result: installResult
+            )
+        }
+
+        let verificationResult: CommandRunnerResult
+        do {
+            verificationResult = try await runner.run(
+                executable: privatePython,
+                arguments: ["-c", versionProbe]
+            )
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            throw failure(
+                stage: "Pinned dependency verification",
+                pythonPath: privatePython,
+                details: error.localizedDescription
+            )
+        }
+        guard verificationResult.exitCode == 0 else {
+            throw failure(
+                stage: "Pinned dependency verification",
+                pythonPath: privatePython,
+                result: verificationResult
+            )
+        }
+
+        return privatePython
     }
 
     static func ensureInstalled(
         pythonPath: URL,
         runner: CommandRunner = SystemCommandRunner()
     ) async throws -> Bool {
-        // Probe in priority order:
-        //   1. `python -c "import markitdown"` — works on any python where markitdown is importable
-        //      (e.g. inside a venv where pip show might not report it)
-        let probeResult = try await runner.run(
-            executable: pythonPath,
-            arguments: ["-c", "import markitdown, sys; sys.stdout.write(markitdown.__file__)"]
-        )
-        if probeResult.exitCode == 0 {
-            return true
-        }
-        //   2. pip install into the python. Use --break-system-packages to bypass PEP 668
-        //      (Homebrew Python 3.11+ is externally-managed by default).
-        let installResult = try await runner.run(
-            executable: pythonPath,
-            arguments: ["-m", "pip", "install", "--user", "--break-system-packages", "markitdown[all]"]
-        )
-        if installResult.exitCode == 0 {
-            return true
-        }
-        //   3. Last resort: try without --user (system-wide install) with --break-system-packages.
-        let systemInstall = try await runner.run(
-            executable: pythonPath,
-            arguments: ["-m", "pip", "install", "--break-system-packages", "markitdown[all]"]
-        )
-        if systemInstall.exitCode == 0 {
-            return true
-        }
+        try await findOrInstall(candidates: [pythonPath], runner: runner) != nil
+    }
 
-        let finalError = systemInstall.stderr.isEmpty
-            ? installResult.stderr
-            : systemInstall.stderr
-        throw MarkitdownInstallerError.installationFailed(
+    private static func defaultRequirementsURL() -> URL {
+        if let bundled = Bundle.main.url(
+            forResource: "requirements-macos",
+            withExtension: "txt"
+        ) {
+            return bundled
+        }
+        return URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+            .appendingPathComponent("Resources/requirements-macos.txt")
+    }
+
+    private static func failure(
+        stage: String,
+        pythonPath: URL,
+        result: CommandRunnerResult
+    ) -> MarkitdownInstallerError {
+        let details = result.stderr.trimmingCharacters(in: .whitespacesAndNewlines)
+        let fallback = result.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        return failure(
+            stage: stage,
             pythonPath: pythonPath,
-            stderr: finalError
+            details: details.isEmpty ? fallback : details
+        )
+    }
+
+    private static func failure(
+        stage: String,
+        pythonPath: URL,
+        details: String
+    ) -> MarkitdownInstallerError {
+        .preparationFailed(
+            stage: stage,
+            pythonPath: pythonPath,
+            details: details
         )
     }
 }

@@ -5,7 +5,7 @@ import Foundation
 final class AppCoordinator {
     let state: AppState
     let dropDelegate: ItemDropDelegate
-    private let markitdownRunner: MarkitdownRunning
+    private let markitdownRunner: DocumentConverting
     private let engine: ConversionEngine
     private let logger: Logger?
 
@@ -17,14 +17,15 @@ final class AppCoordinator {
     init(
         state: AppState,
         dropDelegate: ItemDropDelegate,
-        markitdownRunner: MarkitdownRunning = MarkitdownRunner(),
+        markitdownRunner: DocumentConverting = MarkitdownRunner(),
         engine: ConversionEngine? = nil,
         logger: Logger? = nil
     ) {
         self.state = state
         self.dropDelegate = dropDelegate
-        self.markitdownRunner = markitdownRunner
-        self.engine = engine ?? ConversionEngine(markitdown: markitdownRunner)
+        let router = HybridConversionRouter(markitdown: markitdownRunner, inspector: PDFInspectorRunner())
+        self.markitdownRunner = router
+        self.engine = engine ?? ConversionEngine(markitdown: router)
         self.logger = logger
     }
 
@@ -36,17 +37,16 @@ final class AppCoordinator {
                 await logger?.log("WARN", "No suitable Python 3.10+ found")
                 return
             }
-            state.mode = .installing(progress: "Looking for existing markitdown…")
+            state.mode = .installing(progress: "Preparing the private conversion environment…")
             let chosen = try await MarkitdownInstaller.findOrInstall(candidates: candidates)
             if let chosen {
                 state.pythonPath = chosen
                 state.mode = .empty
                 await logger?.log("INFO", "Bootstrap complete: \(chosen.path)")
             } else {
-                let first = candidates.first!.path
                 state.mode = .installFailed(
-                    "Could not install markitdown. Run manually:\n" +
-                    "\(first) -m pip install --user --break-system-packages 'markitdown[all]'"
+                    "Could not prepare the private conversion environment. " +
+                    "Check your internet connection, then click Recheck."
                 )
             }
         } catch {
